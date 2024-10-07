@@ -34,7 +34,8 @@ def load_data():
     combined_df = combined_df[combined_df['status_title'] == 'ได้รับการรับรอง']
     combined_df['garden_province'] = combined_df['garden_address'].apply(extract_province)
     combined_df['farmer_province'] = combined_df['farmer_address'].apply(extract_province)
-    
+    combined_df = combined_df[(combined_df['mobile'].notna()) | (combined_df['email'].notna())]
+
     combined_df = combined_df[['fullname', 'name', 'type_name', 'mobile', 'email', 'garden_address', 'garden_province', 
                                'farmer_address', 'farmer_province', 'area_size', 'plant_qty', 'cycle_qty', 
                                'output_qty', 'garden_code', 'status_title']]
@@ -114,6 +115,13 @@ if sort == "Yes":
     dataset = dataset.sort_values(
         by=sort_field, ascending=sort_direction == "⬆️", ignore_index=True
     )
+    
+st.download_button(
+    label="Export File",
+    data=dataset.to_csv(index=False).encode('utf-8'),
+    file_name='farm.csv',
+    mime='text/csv'
+)
 
 # Pagination section
 pagination = st.container()
