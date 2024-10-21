@@ -4,14 +4,28 @@ import re
 import os
 import zipfile
 
-st.set_page_config(layout="centered")
+st.set_page_config(layout="wide")
+
+province_order = [
+    'กรุงเทพมหานคร', 'กระบี่', 'กาญจนบุรี', 'กาฬสินธุ์', 'กำแพงเพชร', 'ขอนแก่น', 'จันทบุรี', 
+    'ฉะเชิงเทรา', 'ชลบุรี', 'ชัยนาท', 'ชัยภูมิ', 'ชุมพร', 'เชียงราย', 'เชียงใหม่', 'ตรัง', 
+    'ตราด', 'ตาก', 'นครนายก', 'นครปฐม', 'นครพนม', 'นครราชสีมา', 'นครศรีธรรมราช', 'นครสวรรค์', 
+    'นนทบุรี', 'นราธิวาส', 'น่าน', 'บึงกาฬ', 'บุรีรัมย์', 'ปทุมธานี', 'ประจวบคีรีขันธ์', 
+    'ปราจีนบุรี', 'ปัตตานี', 'พระนครศรีอยุธยา', 'พังงา', 'พัทลุง', 'พิจิตร', 'พิษณุโลก', 
+    'เพชรบุรี', 'เพชรบูรณ์', 'แพร่', 'ภูเก็ต', 'มหาสารคาม', 'มุกดาหาร', 'แม่ฮ่องสอน', 
+    'ยโสธร', 'ยะลา', 'ร้อยเอ็ด', 'ระนอง', 'ระยอง', 'ราชบุรี', 'ลพบุรี', 'ลำปาง', 'ลำพูน', 
+    'เลย', 'ศรีสะเกษ', 'สกลนคร', 'สงขลา', 'สตูล', 'สมุทรปราการ', 'สมุทรสงคราม', 'สมุทรสาคร', 
+    'สระบุรี', 'สระแก้ว', 'สิงห์บุรี', 'สุโขทัย', 'สุพรรณบุรี', 'สุราษฎร์ธานี', 'สุรินทร์', 
+    'หนองคาย', 'หนองบัวลำภู', 'อ่างทอง', 'อำนาจเจริญ', 'อุดรธานี', 'อุตรดิตถ์', 
+    'อุทัยธานี', 'อุบลราชธานี'
+]
 
 # Synchronous function for loading data
 @st.cache_data(show_spinner=True)
 def load_data():
     dataframes = []
     zip_folder = 'data'  # Folder where the zip files are stored
-    
+    current_index = 0
     # Iterate over all zip files in the folder
     for filename in os.listdir(zip_folder):
         if filename.endswith('.zip'):
@@ -25,37 +39,60 @@ def load_data():
                         # Open CSV file inside zip
                         with zip_ref.open(csv_file) as file:
                             # Read the CSV file into a DataFrame
-                            df = pd.read_csv(file)
+                            df = pd.read_csv(file, encoding='utf-8', encoding_errors='ignore')
                             clean_df = df.drop_duplicates()  # Clean the data
-                            dataframes.append(clean_df)
+
+                            # Add a custom index to the dataframe
+                            clean_df.index = range(current_index, current_index + len(clean_df))
+                            current_index += len(clean_df)
+
+                            dataframes.append(clean_df) 
     
     # Combine all DataFrames into one
     combined_df = pd.concat(dataframes, ignore_index=True)
-    combined_df = combined_df[combined_df['status_title'] == 'ได้รับการรับรอง']
-    combined_df['garden_province'] = combined_df['garden_address'].apply(extract_province)
-    combined_df['farmer_province'] = combined_df['farmer_address'].apply(extract_province)
-    combined_df = combined_df[(combined_df['mobile'].notna()) | (combined_df['email'].notna())]
+    # combined_df = combined_df[combined_df['status_title'] == 'ได้รับการรับรอง']
+    # combined_df = combined_df[combined_df['type_name'] != 'ผักสวนครัว']
+    # combined_df['garden_province'] = combined_df['garden_address'].apply(extract_province)
+    # combined_df['farmer_province'] = combined_df['farmer_address'].apply(extract_province)
+    # combined_df = combined_df[
+    #     ((combined_df['mobile'].notna()) & (combined_df['mobile'] != '-') & (combined_df['mobile'] != 0)) | 
+    #     ((combined_df['email'].notna()) & (combined_df['email'] != '-') & (combined_df['email'] != 0))
+    # ]
 
-    combined_df = combined_df[['fullname', 'name', 'type_name', 'mobile', 'email', 'garden_address', 'garden_province', 
-                               'farmer_address', 'farmer_province', 'area_size', 'plant_qty', 'cycle_qty', 
-                               'output_qty', 'garden_code', 'status_title']]
+
+    # combined_df = combined_df[['fullname', 'name', 'type_name', 'mobile', 'email', 'garden_address', 'garden_province', 
+    #                            'farmer_address', 'farmer_province', 'area_size', 'plant_qty', 'cycle_qty', 
+    #                            'output_qty', 'garden_code', 'status_title']]
     
-    combined_df.rename(columns={
-        'fullname': 'ชื่อ-นามสกุล',
-        'garden_code': 'รหัสแปลง',
-        'garden_address': 'ที่อยู่แปลง', 
-        'garden_province': 'จังหวัด (แปลง)',
-        'farmer_address': 'ที่อยู่เกษตรกร', 
-        'farmer_province': 'จังหวัด (เกษตรกร)', 
-        'area_size': 'พื้นที่ปลูก(ไร่)', 
-        'plant_qty': 'จำนวน(ต้น)',
-        'cycle_qty': 'รอบการผลิต', 
-        'output_qty': 'ปริมาณการผลิต(กิโลกรัม)', 
-        'name': 'ชื่อพืช', 
-        'type_name': 'มาตรฐานการผลิต', 
-        'status_title': 'สถานะ'
-    }, inplace=True)
-    
+    # combined_df.rename(columns={
+    #     'fullname': 'ชื่อ-นามสกุล',
+    #     'garden_code': 'รหัสแปลง',
+    #     'garden_address': 'ที่อยู่แปลง', 
+    #     'garden_province': 'จังหวัด (แปลง)',
+    #     'farmer_address': 'ที่อยู่เกษตรกร', 
+    #     'farmer_province': 'จังหวัด (เกษตรกร)', 
+    #     'area_size': 'พื้นที่ปลูก(ไร่)', 
+    #     'plant_qty': 'จำนวน(ต้น)',
+    #     'cycle_qty': 'รอบการผลิต', 
+    #     'output_qty': 'ปริมาณการผลิต(กิโลกรัม)', 
+    #     'name': 'ชื่อพืช', 
+    #     'type_name': 'มาตรฐานการผลิต', 
+    #     'status_title': 'สถานะ'
+    # }, inplace=True)
+
+    # combined_df['จังหวัด (แปลง)'] = combined_df['จังหวัด (แปลง)'].fillna('ไม่ระบุ')
+    # combined_df['จังหวัด (เกษตรกร)'] = combined_df['จังหวัด (เกษตรกร)'].fillna('ไม่ระบุ')
+
+    # # Convert 'จังหวัด (แปลง)' column to categorical for sorting
+    combined_df['จังหวัด (แปลง)'] = pd.Categorical(
+        combined_df['จังหวัด (แปลง)'], 
+        categories=province_order + ['ไม่ระบุ'],  # Add 'ไม่ระบุ' to categories
+        ordered=True
+    )
+
+    # Sort the DataFrame by 'จังหวัด (แปลง)'
+    combined_df.sort_values(by='จังหวัด (แปลง)', inplace=True)
+    combined_df.reset_index(drop=True, inplace=True)
     return combined_df
 
 # Helper function for extracting province
@@ -127,7 +164,7 @@ st.download_button(
 pagination = st.container()
 bottom_menu = st.columns((4, 1, 1))
 with bottom_menu[2]:
-    batch_size = st.selectbox("Page Size", options=[50, 100, 150])
+    batch_size = st.selectbox("Page Size", options=[100, 150, 200])
 with bottom_menu[1]:
     total_pages = (
         int(len(dataset) / batch_size) if int(len(dataset) / batch_size) > 0 else 1
@@ -142,4 +179,4 @@ with bottom_menu[0]:
 pages = split_frame(dataset, batch_size)
 
 # Display the dataframe with custom height and filtering options
-pagination.dataframe(data=pages[current_page - 1], use_container_width=True, height=600, hide_index=True)
+pagination.dataframe(data=pages[current_page - 1], use_container_width=True, height=800, hide_index=True)
