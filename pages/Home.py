@@ -11,7 +11,7 @@ province_order = [
     'ฉะเชิงเทรา', 'ชลบุรี', 'ชัยนาท', 'ชัยภูมิ', 'ชุมพร', 'เชียงราย', 'เชียงใหม่', 'ตรัง', 
     'ตราด', 'ตาก', 'นครนายก', 'นครปฐม', 'นครพนม', 'นครราชสีมา', 'นครศรีธรรมราช', 'นครสวรรค์', 
     'นนทบุรี', 'นราธิวาส', 'น่าน', 'บึงกาฬ', 'บุรีรัมย์', 'ปทุมธานี', 'ประจวบคีรีขันธ์', 
-    'ปราจีนบุรี', 'ปัตตานี', 'พระนครศรีอยุธยา', 'พังงา', 'พัทลุง', 'พิจิตร', 'พิษณุโลก', 
+    'ปราจีนบุรี', 'ปัตตานี', 'พระนครศรีอยุธยา', 'พะเยา', 'พังงา', 'พัทลุง', 'พิจิตร', 'พิษณุโลก', 
     'เพชรบุรี', 'เพชรบูรณ์', 'แพร่', 'ภูเก็ต', 'มหาสารคาม', 'มุกดาหาร', 'แม่ฮ่องสอน', 
     'ยโสธร', 'ยะลา', 'ร้อยเอ็ด', 'ระนอง', 'ระยอง', 'ราชบุรี', 'ลพบุรี', 'ลำปาง', 'ลำพูน', 
     'เลย', 'ศรีสะเกษ', 'สกลนคร', 'สงขลา', 'สตูล', 'สมุทรปราการ', 'สมุทรสงคราม', 'สมุทรสาคร', 
@@ -91,13 +91,13 @@ def load_data():
     )
 
     # Sort the DataFrame by 'จังหวัด (แปลง)'
-    combined_df.sort_values(by='จังหวัด (แปลง)', inplace=True)
+    # combined_df.sort_values(by='จังหวัด (แปลง)', inplace=True)
     combined_df.reset_index(drop=True, inplace=True)
     return combined_df
 
 # Helper function for extracting province
 def extract_province(address):
-    match = re.search(r"จ\.(\S+)", address)
+    match = re.search(r"จ\.\s*([^\s\d]+)", address)
     if match:
         return match.group(1)
     return None
@@ -110,12 +110,23 @@ def split_frame(input_df, rows):
 
 # Load dataset
 dataset = load_data()
-
+col_filters = ['ชื่อพืช', 'จังหวัด (แปลง)', 'จังหวัด (เกษตรกร)', 'ชื่อ-นามสกุล']
+reordered_filters = []
+with st.expander("Reorder Filter Criteria"):
+    available_filters = col_filters.copy()
+    for i in range(len(col_filters)):
+        choice = st.selectbox(
+            f"Select filter for criteria {i+1}", 
+            options=available_filters, 
+            key=f"reorder_{i}"
+        )
+        reordered_filters.append(choice)
+        available_filters.remove(choice)
 # Filter section
 with st.expander("Filter Data"):
     filters = {}
-    col_filters = ['ชื่อพืช', 'ชื่อ-นามสกุล', 'จังหวัด (แปลง)', 'จังหวัด (เกษตรกร)']
-    for col in col_filters:
+    
+    for col in reordered_filters:
         if pd.api.types.is_numeric_dtype(dataset[col]):
             min_val, max_val = st.slider(
                 f"Filter by {col}", 
@@ -127,16 +138,24 @@ with st.expander("Filter Data"):
         else:
             unique_vals = dataset[col].unique()
             selected_vals = st.multiselect(f"Filter by {col}", options=unique_vals)
-            filters[col] = selected_vals
+            if selected_vals:
+                filters[col] = selected_vals
+                # Apply categorical filter to the dataset
+                dataset = dataset[dataset[col].isin(filters[col])]
+            # filters[col] = selected_vals
     
     # Apply filters
+    filter_mask = pd.Series([True] * len(dataset))
     for col, filter_vals in filters.items():
         if isinstance(filter_vals, tuple):  # Numeric filter
             dataset = dataset[dataset[col].between(*filter_vals)]
         else:  # Categorical filter
             if filter_vals:  # Only apply if there are selected values
+                filter_mask &= dataset[col].isin(filter_vals)
                 dataset = dataset[dataset[col].isin(filter_vals)].reset_index(drop=True)
-                st.write(f"Result: {len(dataset)} records.")
+
+    # dataset = dataset[filter_mask].reset_index(drop=True)
+    st.write(f"Result: {len(dataset)} records.")
 
 # Sorting section
 top_menu = st.columns(3)
